@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Central Pier Arcade — Ticket Inventory</title>
+
+  <!-- iOS PWA Configuration -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Arcade Tickets" />
+  <meta name="theme-color" content="#FBFBFB" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Prevent unwanted iOS Safari input auto-zoom on mobile */
+    @media screen and (max-width: 767px) {
+      input[type="number"],
+      input[type="text"] {
+        font-size: 16px !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-[#FBFBFB] text-[#1D1D1F] min-h-screen antialiased selection:bg-blue-100 selection:text-blue-900 pb-12">
+
+  <!-- Minimal Apple/Notion Top Bar -->
+  <header class="bg-white/80 backdrop-blur-md border-b border-[#E5E5E7] sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-lg bg-[#0071E3] flex items-center justify-center text-white shadow-sm">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+            <circle cx="12" cy="12" r="2"></circle>
+            <path d="M6 12h.01M18 12h.01"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-semibold tracking-tight text-[#1D1D1F] leading-tight">Central Pier Arcade</h1>
+          <p class="text-[11px] text-[#6E6E73]">Ticket Inventory &amp; IoT Dispatch</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div class="flex items-center bg-[#F5F5F7] border border-[#E5E5E7] rounded-lg p-1">
+          <span class="text-xs text-[#6E6E73] pl-2 pr-1.5 hidden sm:inline">Boxes</span>
+          <input
+            id="input-boxes"
+            type="number"
+            min="1"
+            value="1"
+            class="w-12 bg-white border border-[#D2D2D7] rounded-md px-1.5 py-1 text-xs text-center font-medium tabular-nums focus:outline-none focus:border-[#0071E3]"
+          />
+          <button
+            onclick="addBoxes()"
+            class="ml-1.5 px-2.5 py-1 text-xs font-medium bg-[#1D1D1F] hover:bg-black active:scale-[0.98] text-white rounded-md transition"
+          >
+            + Add Storage
+          </button>
+        </div>
+
+        <button
+          onclick="loadDashboard()"
+          class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-[#F5F5F7] active:scale-[0.98] text-[#1D1D1F] rounded-lg border border-[#D2D2D7] transition"
+        >
+          Refresh
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- Subtle Floating Toast -->
+    <div id="toast" class="hidden fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium transition-all"></div>
+
+    <!-- Clean KPI Strip -->
+    <section class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div class="bg-white border border-[#E5E5E7] rounded-xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <p class="text-[11px] font-medium text-[#6E6E73]">Total Blocks</p>
+        <p id="kpi-total" class="text-2xl font-semibold tracking-tight text-[#1D1D1F] mt-1 tabular-nums">--</p>
+        <p id="kpi-tickets" class="text-[11px] text-[#86868B] mt-1 tabular-nums">-- tickets</p>
+      </div>
+
+      <div class="bg-white border border-[#E5E5E7] rounded-xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <p class="text-[11px] font-medium text-[#6E6E73]">In Use</p>
+        <p id="kpi-in-use" class="text-2xl font-semibold tracking-tight text-[#0071E3] mt-1 tabular-nums">--</p>
+        <p id="kpi-units" class="text-[11px] text-[#86868B] mt-1 tabular-nums">Across -- units</p>
+      </div>
+
+      <div class="bg-white border border-[#E5E5E7] rounded-xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <p class="text-[11px] font-medium text-[#6E6E73]">Floor Reserve</p>
+        <p id="kpi-reserve" class="text-2xl font-semibold tracking-tight text-[#1D1D1F] mt-1 tabular-nums">--</p>
+        <p class="text-[11px] text-[#86868B] mt-1">Ready for refill</p>
+      </div>
+
+      <div class="bg-white border border-[#E5E5E7] rounded-xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <p class="text-[11px] font-medium text-[#6E6E73]">Storage</p>
+        <p id="kpi-storage" class="text-2xl font-semibold tracking-tight text-[#1D1D1F] mt-1 tabular-nums">--</p>
+        <p id="kpi-boxes" class="text-[11px] text-[#86868B] mt-1 tabular-nums">-- boxes (50 blq/box)</p>
+      </div>
+
+      <div class="bg-white border border-[#E5E5E7] rounded-xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] col-span-2 sm:col-span-1">
+        <p class="text-[11px] font-medium text-[#6E6E73]">Low Stock</p>
+        <p id="kpi-alerts" class="text-2xl font-semibold tracking-tight text-amber-600 mt-1 tabular-nums">--</p>
+        <p class="text-[11px] text-[#86868B] mt-1">Capacity &le; 35%</p>
+      </div>
+    </section>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+      <!-- Left (2/3): Machine Management -->
+      <section class="lg:col-span-2 bg-white border border-[#E5E5E7] rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.03)] overflow-hidden">
+        
+        <!-- Controls & Filters Bar -->
+        <div class="px-5 py-3.5 border-b border-[#E5E5E7] flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm font-semibold text-[#1D1D1F]">Machines</h2>
+            <span id="visible-count" class="text-xs text-[#86868B] tabular-nums"></span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="relative">
+              <input
+                id="search-input"
+                type="text"
+                placeholder="Filter by name..."
+                oninput="renderMachines()"
+                class="w-36 sm:w-52 bg-[#F5F5F7] border border-transparent focus:bg-white focus:border-[#0071E3] text-xs text-[#1D1D1F] placeholder-[#86868B] rounded-lg px-3 py-1.5 focus:outline-none transition"
+              />
+            </div>
+
+            <!-- Apple Segmented Filter -->
+            <div class="inline-flex bg-[#F5F5F7] p-0.5 rounded-lg border border-[#E5E5E7]">
+              <button
+                id="filter-all"
+                onclick="setAlertFilter(false)"
+                class="px-2.5 py-1 text-xs font-medium rounded-md bg-white text-[#1D1D1F] shadow-sm transition"
+              >
+                All
+              </button>
+              <button
+                id="filter-low"
+                onclick="setAlertFilter(true)"
+                class="px-2.5 py-1 text-xs font-medium rounded-md text-[#6E6E73] hover:text-[#1D1D1F] transition"
+              >
+                Low Stock
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instructional Sub-bar -->
+        <div class="px-5 py-2 bg-[#FBFBFB] border-b border-[#E5E5E7] text-[11px] text-[#6E6E73] flex items-center justify-between">
+          <span class="hidden md:inline">Tip: Click any <span class="font-medium text-[#1D1D1F]">In Use</span> value to edit its physical count inline.</span>
+          <span class="inline md:hidden">Mobile Mode: Use <span class="font-medium text-[#1D1D1F]">&minus;0.25 / +0.25</span> buttons for instant floor count updates.</span>
+          <span id="iot-status-indicator" class="inline-flex items-center gap-1.5 text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            IoT Active
+          </span>
+        </div>
+
+        <!-- 1. Mobile Responsive Card View (< 768px) -->
+        <div id="machines-cards" class="block md:hidden divide-y divide-[#F0F0F2]"></div>
+
+        <!-- 2. Desktop Clean Notion Table View (>= 768px) -->
+        <div class="hidden md:block overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-[#E5E5E7] text-[11px] font-medium text-[#6E6E73] bg-[#FBFBFB]">
+                <th class="py-2.5 px-5">Machine</th>
+                <th class="py-2.5 px-4">In Use (Click to edit)</th>
+                <th class="py-2.5 px-4 text-center">Reserve</th>
+                <th class="py-2.5 px-5 text-right">Quick Refill</th>
+              </tr>
+            </thead>
+            <tbody id="machines-tbody" class="divide-y divide-[#F0F0F2] text-xs"></tbody>
+          </table>
+        </div>
+
+      </section>
+
+      <!-- Right (1/3): Notion-Style Activity Log -->
+      <section class="bg-white border border-[#E5E5E7] rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.03)] overflow-hidden">
+        <div class="px-5 py-3.5 border-b border-[#E5E5E7]">
+          <h2 class="text-sm font-semibold text-[#1D1D1F]">Activity Log</h2>
+          <p class="text-[11px] text-[#86868B]">Recent physical counts &amp; IoT events</p>
+        </div>
+        <div id="activity-list" class="divide-y divide-[#F0F0F2] max-h-[640px] overflow-y-auto"></div>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    let machinesCache = [];
+    let onlyAlerts = false;
+    let editingMachineId = null;
+
+    function showToast(message, isError = false) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.className = `fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium ${
+        isError
+          ? "bg-red-600 text-white"
+          : "bg-[#1D1D1F] text-white"
+      }`;
+      toast.classList.remove("hidden");
+      setTimeout(() => toast.classList.add("hidden"), 3000);
+    }
+
+    function setAlertFilter(state) {
+      onlyAlerts = state;
+      const btnAll = document.getElementById("filter-all");
+      const btnLow = document.getElementById("filter-low");
+
+      if (onlyAlerts) {
+        btnLow.className = "px-2.5 py-1 text-xs font-medium rounded-md bg-white text-amber-700 shadow-sm transition";
+        btnAll.className = "px-2.5 py-1 text-xs font-medium rounded-md text-[#6E6E73] hover:text-[#1D1D1F] transition";
+      } else {
+        btnAll.className = "px-2.5 py-1 text-xs font-medium rounded-md bg-white text-[#1D1D1F] shadow-sm transition";
+        btnLow.className = "px-2.5 py-1 text-xs font-medium rounded-md text-[#6E6E73] hover:text-[#1D1D1F] transition";
+      }
+      renderMachines();
+    }
+
+    async function loadDashboard() {
+      try {
+        const res = await fetch("/api/dashboard");
+        const data = await res.json();
+
+        document.getElementById("kpi-total").textContent = data.kpis.total_blocks;
+        document.getElementById("kpi-tickets").textContent = `${data.kpis.total_tickets.toLocaleString()} tickets`;
+        document.getElementById("kpi-in-use").textContent = data.kpis.in_use;
+        document.getElementById("kpi-units").textContent = `Across ${data.kpis.total_units} units`;
+        document.getElementById("kpi-reserve").textContent = data.kpis.reserve;
+        document.getElementById("kpi-storage").textContent = data.kpis.storage_blocks;
+        document.getElementById("kpi-boxes").textContent = `${data.kpis.storage_boxes} boxes (50 blq/box)`;
+        document.getElementById("kpi-alerts").textContent = data.kpis.active_alerts;
+
+        machinesCache = data.machines;
+        renderMachines();
+        renderLogs(data.logs);
+      } catch (err) {
+        showToast("Unable to reach backend server", true);
+      }
+    }
+
+    function startInlineEdit(id) {
+      editingMachineId = id;
+      renderMachines();
+      setTimeout(() => {
+        const desktopInput = document.getElementById(`edit-count-${id}`);
+        const mobileInput = document.getElementById(`mobile-edit-count-${id}`);
+        const input = desktopInput || mobileInput;
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }, 50);
+    }
+
+    function cancelInlineEdit() {
+      editingMachineId = null;
+      renderMachines();
+    }
+
+    async function saveInlineCount(id) {
+      const desktopInput = document.getElementById(`edit-count-${id}`);
+      const mobileInput = document.getElementById(`mobile-edit-count-${id}`);
+      const input = desktopInput || mobileInput;
+      if (!input) return;
+      const val = parseFloat(input.value);
+      editingMachineId = null;
+      await postAction(`/api/machines/${id}/count`, { new_in_use: val });
+    }
+
+    async function quickAdjustCount(id, delta) {
+      const machine = machinesCache.find(m => m.id === id);
+      if (!machine) return;
+      const newCount = Math.max(0, Math.min(machine.max_capacity, Math.round((machine.in_use + delta) * 100) / 100));
+      if (newCount === machine.in_use) return;
+      await postAction(`/api/machines/${id}/count`, { new_in_use: newCount });
+    }
+
+    async function oneTapRefill(id, reserve) {
+      if (reserve <= 0) {
+        showToast("Floor reserve empty. Pull from storage first.", true);
+        return;
+      }
+      const amount = Math.min(1.0, reserve);
+      await postAction(`/api/machines/${id}/refill`, { amount });
+    }
+
+    function renderMachines() {
+      const query = document.getElementById("search-input").value.toLowerCase();
+      const tbody = document.getElementById("machines-tbody");
+      const cardsContainer = document.getElementById("machines-cards");
+
+      tbody.innerHTML = "";
+      cardsContainer.innerHTML = "";
+
+      const filtered = machinesCache.filter(m => {
+        const matchesQuery = m.name.toLowerCase().includes(query);
+        const matchesAlert = onlyAlerts ? m.alert : true;
+        return matchesQuery && matchesAlert;
+      });
+
+      document.getElementById("visible-count").textContent = `(${filtered.length})`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-[#86868B] text-xs">No matching machines found.</td></tr>`;
+        cardsContainer.innerHTML = `<div class="p-8 text-center text-[#86868B] text-xs">No matching machines found.</div>`;
+        return;
+      }
+
+      filtered.forEach(m => {
+        const barColor = m.alert ? "bg-amber-500" : "bg-[#0071E3]";
+        const statusBadge = m.alert
+          ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200/80">Low Stock</span>`
+          : "";
+
+        // ==========================================
+        // 1. Desktop Table Row
+        // ==========================================
+        let desktopInUseCell = "";
+        if (editingMachineId === m.id) {
+          desktopInUseCell = `
+            <div class="inline-flex items-center gap-1">
+              <input
+                id="edit-count-${m.id}"
+                type="number"
+                step="0.05"
+                min="0"
+                max="${m.max_capacity}"
+                value="${m.in_use}"
+                onkeydown="if(event.key==='Enter') saveInlineCount(${m.id}); if(event.key==='Escape') cancelInlineEdit();"
+                class="w-16 bg-white border border-[#0071E3] rounded-md px-2 py-1 text-xs font-medium tabular-nums focus:outline-none"
+              />
+              <button onclick="saveInlineCount(${m.id})" class="px-2 py-1 bg-[#0071E3] text-white rounded-md text-[11px] font-medium">Save</button>
+              <button onclick="cancelInlineEdit()" class="px-1.5 py-1 text-[#6E6E73] hover:text-[#1D1D1F] text-[11px]">Cancel</button>
+            </div>
+          `;
+        } else {
+          desktopInUseCell = `
+            <div onclick="startInlineEdit(${m.id})" class="group cursor-pointer rounded-lg p-1.5 -m-1.5 hover:bg-[#F5F5F7] transition">
+              <div class="flex items-center justify-between gap-3 mb-1 tabular-nums">
+                <span class="font-medium text-[#1D1D1F] group-hover:text-[#0071E3] transition">
+                  ${m.in_use} <span class="text-[#86868B] font-normal">/ ${m.max_capacity} blq</span>
+                </span>
+                <span class="text-[11px] text-[#6E6E73]">${m.percentage}%</span>
+              </div>
+              <div class="w-full bg-[#E5E5E7] rounded-full h-1.5 overflow-hidden">
+                <div class="${barColor} h-1.5 rounded-full transition-all" style="width: ${Math.min(m.percentage, 100)}%"></div>
+              </div>
+            </div>
+          `;
+        }
+
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-[#FBFBFB] transition";
+        tr.innerHTML = `
+          <td class="py-3 px-5 font-medium text-[#1D1D1F] whitespace-nowrap">
+            <div class="flex items-center gap-2">
+              <span>${m.name}</span>
+              ${statusBadge}
+            </div>
+          </td>
+          <td class="py-3 px-4 min-w-[165px]">
+            ${desktopInUseCell}
+          </td>
+          <td class="py-3 px-4 text-center whitespace-nowrap">
+            <div class="inline-flex items-center gap-1 bg-[#F5F5F7] border border-[#E5E5E7] rounded-lg px-2 py-1 tabular-nums">
+              <span class="font-medium text-[#1D1D1F]">${m.reserve} blq</span>
+              <button
+                onclick="postAction('/api/machines/${m.id}/restock-reserve', { amount: parseFloat(document.getElementById('qty-${m.id}') ? document.getElementById('qty-${m.id}').value : 1) })"
+                title="Pull blocks from storage to floor reserve"
+                class="ml-1 w-4 h-4 inline-flex items-center justify-center rounded bg-white border border-[#D2D2D7] text-[#1D1D1F] hover:border-[#0071E3] hover:text-[#0071E3] text-[11px] font-semibold transition"
+              >
+                +
+              </button>
+            </div>
+          </td>
+          <td class="py-3 px-5 text-right whitespace-nowrap">
+            <div class="inline-flex items-center gap-1.5">
+              <input
+                id="qty-${m.id}"
+                type="number"
+                step="0.25"
+                min="0.25"
+                value="1"
+                class="w-14 bg-[#F5F5F7] border border-[#E5E5E7] focus:bg-white focus:border-[#0071E3] rounded-lg px-2 py-1 text-xs text-center font-medium tabular-nums focus:outline-none"
+              />
+              <button
+                onclick="postAction('/api/machines/${m.id}/refill', { amount: parseFloat(document.getElementById('qty-${m.id}').value) })"
+                class="px-3 py-1 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-medium rounded-lg transition"
+              >
+                Refill
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        // ==========================================
+        // 2. Mobile Touch-Friendly Card View (< 768px)
+        // ==========================================
+        const card = document.createElement("div");
+        card.className = "p-4 space-y-3 bg-white";
+
+        let mobileInUseSection = "";
+        if (editingMachineId === m.id) {
+          mobileInUseSection = `
+            <div class="flex items-center gap-2 p-2 bg-[#F5F5F7] rounded-lg border border-[#0071E3]">
+              <span class="text-xs text-[#6E6E73]">Count:</span>
+              <input
+                id="mobile-edit-count-${m.id}"
+                type="number"
+                step="0.05"
+                min="0"
+                max="${m.max_capacity}"
+                value="${m.in_use}"
+                class="flex-1 bg-white border border-[#D2D2D7] rounded-md px-2 py-1.5 text-sm font-semibold tabular-nums focus:outline-none"
+              />
+              <button onclick="saveInlineCount(${m.id})" class="px-3 py-1.5 bg-[#0071E3] text-white rounded-md text-xs font-medium">Save</button>
+              <button onclick="cancelInlineEdit()" class="px-2 py-1.5 text-[#6E6E73] text-xs">Cancel</button>
+            </div>
+          `;
+        } else {
+          mobileInUseSection = `
+            <div onclick="startInlineEdit(${m.id})" class="cursor-pointer active:opacity-75 transition">
+              <div class="flex items-center justify-between text-xs mb-1.5 tabular-nums">
+                <span class="font-medium text-[#1D1D1F]">
+                  In Use: <strong class="text-sm font-semibold">${m.in_use}</strong> <span class="text-[#86868B] font-normal">/ ${m.max_capacity} blq</span>
+                </span>
+                <span class="text-xs font-medium ${m.alert ? 'text-amber-600 font-semibold' : 'text-[#6E6E73]'}">${m.percentage}%</span>
+              </div>
+              <div class="w-full bg-[#E5E5E7] rounded-full h-2 overflow-hidden">
+                <div class="${barColor} h-2 rounded-full transition-all" style="width: ${Math.min(m.percentage, 100)}%"></div>
+              </div>
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <!-- Card Header: Title & Badges & Reserve -->
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="text-sm font-semibold text-[#1D1D1F] tracking-tight">${m.name}</h3>
+                ${statusBadge}
+              </div>
+              <p class="text-[11px] text-[#86868B] mt-0.5">Capacity: ${m.max_capacity} blq (${(m.max_capacity * 2000).toLocaleString()} tickets)</p>
+            </div>
+
+            <!-- Floor Reserve Indicator with Quick Restock -->
+            <div class="shrink-0 flex items-center gap-1 bg-[#F5F5F7] border border-[#E5E5E7] rounded-lg px-2.5 py-1 text-xs tabular-nums">
+              <span class="text-[#6E6E73] text-[11px]">Reserve:</span>
+              <span class="font-semibold text-[#1D1D1F]">${m.reserve} blq</span>
+              <button
+                onclick="postAction('/api/machines/${m.id}/restock-reserve', { amount: 1.0 })"
+                title="Restock +1 blq from storage"
+                class="ml-1 w-5 h-5 rounded bg-white border border-[#D2D2D7] active:bg-[#E5E5E7] text-[#1D1D1F] text-xs font-bold inline-flex items-center justify-center transition"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <!-- Capacity & Progress Bar -->
+          ${mobileInUseSection}
+
+          <!-- Thumb-Friendly Action Steppers & Refill -->
+          <div class="flex items-center justify-between gap-2 pt-1">
+            <!-- Stepper: -0.25 and +0.25 -->
+            <div class="inline-flex items-center bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl p-0.5 shadow-sm">
+              <button
+                onclick="quickAdjustCount(${m.id}, -0.25)"
+                ${m.in_use <= 0 ? 'disabled' : ''}
+                class="h-10 px-3.5 rounded-lg bg-white border border-[#E5E5E7] active:bg-[#F0F0F2] disabled:opacity-35 disabled:cursor-not-allowed text-[#1D1D1F] font-semibold text-xs tabular-nums shadow-sm transition"
+                title="Subtract 0.25 blq"
+              >
+                &minus;0.25
+              </button>
+              <button
+                onclick="startInlineEdit(${m.id})"
+                class="px-2.5 h-10 inline-flex items-center justify-center text-xs font-semibold text-[#1D1D1F] tabular-nums active:text-[#0071E3]"
+                title="Tap to edit directly"
+              >
+                ${m.in_use}
+              </button>
+              <button
+                onclick="quickAdjustCount(${m.id}, 0.25)"
+                ${m.in_use >= m.max_capacity ? 'disabled' : ''}
+                class="h-10 px-3.5 rounded-lg bg-white border border-[#E5E5E7] active:bg-[#F0F0F2] disabled:opacity-35 disabled:cursor-not-allowed text-[#1D1D1F] font-semibold text-xs tabular-nums shadow-sm transition"
+                title="Add 0.25 blq"
+              >
+                +0.25
+              </button>
+            </div>
+
+            <!-- One-Tap Refill Button -->
+            <button
+              onclick="oneTapRefill(${m.id}, ${m.reserve})"
+              ${m.reserve <= 0 ? 'disabled' : ''}
+              class="flex-1 h-10 px-4 rounded-xl font-medium text-xs text-white shadow-sm transition flex items-center justify-center gap-1.5 ${
+                m.reserve > 0
+                  ? 'bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98]'
+                  : 'bg-[#D2D2D7] cursor-not-allowed opacity-60'
+              }"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 5v14M5 12h14"></path>
+              </svg>
+              <span>${m.reserve > 0 ? 'Refill 1 blq' : 'No Reserve'}</span>
+            </button>
+          </div>
+        `;
+        cardsContainer.appendChild(card);
+      });
+    }
+
+    function renderLogs(logs) {
+      const container = document.getElementById("activity-list");
+      if (logs.length === 0) {
+        container.innerHTML = `<p class="text-xs text-[#86868B] text-center py-10">No activity recorded yet.</p>`;
+        return;
+      }
+
+      container.innerHTML = logs.map(log => {
+        const isIoT = log.action.includes("IoT");
+        const badgeColor = isIoT
+          ? "bg-amber-50 text-amber-700 border-amber-200"
+          : "bg-[#F5F5F7] text-[#1D1D1F] border-[#E5E5E7]";
+
+        return `
+          <div class="px-5 py-3 flex items-center justify-between gap-3 hover:bg-[#FBFBFB] transition">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <p class="text-xs font-medium text-[#1D1D1F] truncate">${log.machine_name}</p>
+                ${isIoT ? '<span class="text-[9px] px-1 py-0.2 rounded bg-amber-100 text-amber-800 font-semibold uppercase">IoT</span>' : ''}
+              </div>
+              <p class="text-[11px] text-[#6E6E73] truncate">${log.action}</p>
+            </div>
+            <div class="text-right shrink-0 tabular-nums">
+              <span class="inline-block px-2 py-0.5 rounded-md text-[11px] font-medium border ${badgeColor}">
+                ${log.amount} blq
+              </span>
+              <p class="text-[10px] text-[#86868B] mt-0.5">${log.timestamp}</p>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function postAction(url, payload) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showToast(data.detail || "Action could not be completed", true);
+          return;
+        }
+
+        showToast(data.message);
+        loadDashboard();
+      } catch (err) {
+        showToast("Network error connecting to server", true);
+      }
+    }
+
+    function addBoxes() {
+      const boxes = parseInt(document.getElementById("input-boxes").value);
+      postAction("/api/storage/add-boxes", { boxes });
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
